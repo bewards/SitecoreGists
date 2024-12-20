@@ -6,7 +6,7 @@
 #>
 
 # APPLY UPDATES - set to $true to update the display names with triple decoded values fix
-$applyUpdates = $false
+$applyUpdates = $true
 
 <#
 .SYNOPSIS
@@ -85,16 +85,15 @@ $searchItems | % {
     
     if($dName -match '(&#33|&#34|&#35|&#36|&#37|&#38|&#40|&#41|&#x2c|&#x27|&#x28|&#x29|&amp|&lt|&gt|&quot|&semi)') {
         $filteredItems += $item
-        # only enable this if you need full access to the item
-        # if (($item | Initialize-Item).Versions.IsLatestVersion()) {
-        #     $filteredItems += $item    
-        # }
+    }
+}
 
-        # APPLY UPDATES - triple decode item display names
-        if ($applyUpdates) {
-            $item.Editing.BeginEdit()
-            $item.Fields["_displayname"].Value = [System.Web.HttpUtility]::HtmlDecode([System.Web.HttpUtility]::HtmlDecode([System.Web.HttpUtility]::HtmlDecode($dName)))
-            $item.Editing.EndEdit()
+# APPLY UPDATES - triple decode item display names
+if ($applyUpdates) {
+    New-UsingBlock (New-Object Sitecore.Data.BulkUpdateContext) {
+        $filteredItems | ForEach-Object {
+            $item = Initialize-Item -SearchResultItem $_
+            $item."__display name" = [System.Web.HttpUtility]::HtmlDecode([System.Web.HttpUtility]::HtmlDecode([System.Web.HttpUtility]::HtmlDecode($dName)))
         }
     }
 }
@@ -104,9 +103,11 @@ $reportProps = @{
     PageSize = 50
 }
 $filteredItems | Show-ListView @reportProps -Property `
+    @{ Label = "Item ID"; Expression = { $_.ItemId } },
     @{ Label = "Display Name"; Expression = { Set-EscapeCharacters $_.Fields["_displayname"] } },
     @{ Label = "Display Name Triple Decoded"; Expression = { [System.Web.HttpUtility]::HtmlDecode([System.Web.HttpUtility]::HtmlDecode([System.Web.HttpUtility]::HtmlDecode($_.Fields["_displayname"]))) } },
-    @{ Label = "Name"; Expression = { $_.Name } },
+    @{ Label = "Item Name"; Expression = { $_.Name } },
+    @{ Label = "Item Path"; Expression = { $_.Path } },
     @{ Label = "Template"; Expression = { $_.TemplateName } },
     @{ Label = "Version"; Expression = { $_.Version } }
     
